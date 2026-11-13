@@ -1,0 +1,38 @@
+name: Build THALLFORGE for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Configure CMake
+        run: cmake -S . -B build -A x64
+      - name: Build Release
+        run: cmake --build build --config Release --parallel
+      - name: Package application
+        shell: pwsh
+        run: |
+          $app = "build/THALLFORGE_artefacts/Release/THALLFORGE.exe"
+          if (!(Test-Path $app)) {
+            Get-ChildItem build -Recurse -Filter THALLFORGE.exe | Format-List FullName
+            throw "THALLFORGE.exe was not produced at the expected path."
+          }
+          New-Item -ItemType Directory -Force -Path package | Out-Null
+          Copy-Item $app package/
+          Compress-Archive -Path package/* -DestinationPath THALLFORGE-Windows-x64.zip -Force
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: THALLFORGE-Windows-x64
+          path: THALLFORGE-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
